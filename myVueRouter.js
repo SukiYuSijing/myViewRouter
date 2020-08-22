@@ -31,6 +31,20 @@ function extractUpdateRoutesFn(updatedRoutes) {
     })
     return fns
 }
+
+function registerInstance(vm, callVal) {
+    var i = vm.$options._parentVnode;
+    if (i){
+        i= i.data
+        if (i ) {
+            i = i.registerInstance
+            if(i){
+                i(vm, callVal);
+            }
+        }
+    }
+};
+
 function extractLeaveRoutesFn(deviatedRoutes) {
     var fns = []
     deviatedRoutes&&deviatedRoutes.forEach(deviatedRoute=>{
@@ -50,7 +64,7 @@ function extractLeaveRoutesFn(deviatedRoutes) {
 }
 
 var cbs = []
-    function extractEnterGuards(activatedRoutes, postEnterCbs) {
+function extractEnterGuards(activatedRoutes, postEnterCbs) {
     var fns = []
     activatedRoutes&&activatedRoutes.forEach(activatedRoute=>{
         // debugger
@@ -116,9 +130,17 @@ class VueRouter{
                 this.push(obj)
             })
             window.addEventListener("hashchange",(event)=>{
-                // debugger
-                let obj = formatPathObj(location.hash)
-                this.push(obj)
+                debugger
+                console.log(this,this.toRoute.fullPath)
+                let h = this.toRoute.fullPath
+                if(!h.startsWith('#')){
+                    h = "#"+h
+                }
+                if(!h===location.hash) {
+                    let obj = formatPathObj(location.hash)
+                    this.push(obj)
+                }
+
 
             })
         }else if(this.mode == 'history'){
@@ -138,15 +160,15 @@ class VueRouter{
             this.addRouteRecord(pathList, pathMap, nameMap, route)
         })
         // // debugger
-        console.log(pathList,nameMap,pathMap)
+        // console.log(pathList,nameMap,pathMap)
     }
     /*
     * @match函数是根据参数lacation得到对应的record
     *
     */
     match(routeObj){
-        console.log("routeObj",routeObj)
-        console.log( this.pathList,this.pathMap,this.nameMap)
+        // console.log("routeObj",routeObj)
+        // console.log( this.pathList,this.pathMap,this.nameMap)
         if(routeObj.path){
             //如果是path的话会从pathmap里面选择
             let record = this.pathMap[routeObj.path]
@@ -154,7 +176,7 @@ class VueRouter{
                 for(let o of Object.values(this.pathMap)){
                     // debugger
                     var a = o.regey.test(routeObj.path)
-                    console.log(a)
+                    // console.log(a)
                     if(a) {
                         record = o
                         // record.path = routeObj.path
@@ -162,8 +184,9 @@ class VueRouter{
                     }
                 }
             }
+            record.path2 = routeObj.path
             let currentRoute = this.createRoute(record)
-            currentRoute.path=routeObj.path
+            delete record.path2
             return currentRoute
         }else if(routeObj.name){
             let name = routeObj.name
@@ -173,12 +196,12 @@ class VueRouter{
             let params = routeObj.params
             let m = path.match(regexp)
             if(m){
-                console.log(m)
+                // console.log(m)
                 m.slice(1).forEach(item=>{
                     path = path.replace(item,(args)=>{
-                            let arg= args.slice(1)
-                            return params[arg]
-                        })
+                        let arg= args.slice(1)
+                        return params[arg]
+                    })
                 })
             }
             let queryStr=''
@@ -210,11 +233,11 @@ class VueRouter{
         var route = {
             name: location.name ,
             meta: (location && location.meta) || {},
-            path: location.path || '/',
+            path: location.path2 || '/',
             hash: location.hash || '',
             // query: query,
             params: location.params || {},
-            fullPath:location.path,
+            fullPath:location.path2,
             matched: location ? this.formatMatch(location) : []
         };
         return route
@@ -268,10 +291,10 @@ class VueRouter{
             let alias = route.alias
             alias = Array.isArray(alias)?alias:[alias]
             alias.forEach((alia)=>{
-               let aliaRoute = {
-                   path:alia,
-                   children:route.children
-               }
+                let aliaRoute = {
+                    path:alia,
+                    children:route.children
+                }
                 let matchAs = route.path
                 this.addRouteRecord(pathList, pathMap, nameMap, aliaRoute,parent,matchAs)
             })
@@ -330,7 +353,7 @@ function resolveAsyncComponents(matched) {
                 })
 
                 var reject = once(function (resolvedDef) {
-                    console.log(resolvedDef)
+                    // console.log(resolvedDef)
                 })
 
                 var res
@@ -357,7 +380,7 @@ function resolveAsyncComponents(matched) {
         })
         if (!hasAsync) { next(); }
     }
-    
+
 }
 
 function formatPathObj(hash){
@@ -392,7 +415,7 @@ VueRouter.prototype.afterEach = function(fn){
 VueRouter.prototype.push =function (routeObj){
     // debugger
     this.transitionTo(routeObj, (route) =>{
-        console.log(route,window.history)
+        // console.log(route,window.history)
         if(this.mode==="history"){
             window.history.pushState({},null,route.fullPath)
         }else if(this.mode ==='hash'){
@@ -401,7 +424,7 @@ VueRouter.prototype.push =function (routeObj){
             window.location.hash = route.fullPath
         }
     },function () {
-        console.log("onAbort")
+        // console.log("onAbort")
     })
 }
 
@@ -418,7 +441,7 @@ VueRouter.prototype.transitionTo =function (routeObj,onComplete,onAbort){
 
     this.ConfirmTransitionTo(this.toRoute, (route)=> {
         // debugger
-        console.log(route)
+        // console.log(route)
         onComplete(route)
         this.afterHooks.forEach(cb=>cb())
         cbs.forEach(cb=>cb())
@@ -429,8 +452,8 @@ VueRouter.prototype.transitionTo =function (routeObj,onComplete,onAbort){
 VueRouter.prototype.ConfirmTransitionTo = function (route,onComplete,onAbort){
     //下面这段代码可以提取成一个函数，resolveQueue
     // debugger
-    console.log(this)
-    if(!this.toRoute||!this.fromRoute) return
+    // console.log(this)
+    if(!this.toRoute||!this.fromRoute||this.toRoute===this.fromRoute) return
     let maxLength = Math.max(this.fromRoute.matched.length,this.toRoute.matched.length)
     var i
     for(i =0;i<maxLength;i++){
@@ -458,11 +481,11 @@ VueRouter.prototype.ConfirmTransitionTo = function (route,onComplete,onAbort){
     }
     let self = this
     let queue = [].concat([
-            ...extractLeaveRoutesFn(transitionRoutes.deviatedRoutes),//在失活的组件里调用离开守卫
-            ...extractUpdateRoutesFn(transitionRoutes.updatedRoutes),
-            ...this.beforeHooks,///调用全局的beforeEach守卫,
-            ...transitionRoutes.activatedRoutes.map(activatedRoute=>activatedRoute.beforeEnter).filter(fn=>fn),//调用路由组件里面beforeEnter
-            resolveAsyncComponents(transitionRoutes.activatedRoutes)
+        ...extractLeaveRoutesFn(transitionRoutes.deviatedRoutes),//在失活的组件里调用离开守卫
+        ...extractUpdateRoutesFn(transitionRoutes.updatedRoutes),
+        ...this.beforeHooks,///调用全局的beforeEach守卫,
+        ...transitionRoutes.activatedRoutes.map(activatedRoute=>activatedRoute.beforeEnter).filter(fn=>fn),//调用路由组件里面beforeEnter
+        resolveAsyncComponents(transitionRoutes.activatedRoutes)
     ])
     //这时候fromRoute还是目前的route，不是toRoute
     this.pending = this.fromRoute
@@ -470,7 +493,7 @@ VueRouter.prototype.ConfirmTransitionTo = function (route,onComplete,onAbort){
         try{
             hook(this.fromRoute,this.toRoute, (to)=> {
                 //前面那些hooks执行完就执行以下代码
-                console.log(to)
+                // console.log(to)
                 if (
                     typeof to === 'string' ||
                     (typeof to === 'object' &&
@@ -484,7 +507,7 @@ VueRouter.prototype.ConfirmTransitionTo = function (route,onComplete,onAbort){
                 }
             })
         }catch (e) {
-            console.log(e)
+            // console.log(e)
         }
     }
 
@@ -493,7 +516,7 @@ VueRouter.prototype.ConfirmTransitionTo = function (route,onComplete,onAbort){
         var queue = extractEnterGuards(transitionRoutes.activatedRoutes,[]).concat(this.resolveHooks)
         runQueue(queue,iterator, ()=> {
             // debugger
-            console.log(cbs)
+            // console.log(cbs)
             this.pending = null;
             // debugger
             onComplete(this.toRoute);//这里用来pushstate实现跳转
@@ -528,7 +551,7 @@ function pathToRegexp(path){
     let m = reg.exec(regX)
     let keys = []
     while(m){
-        console.log(m)
+        // console.log(m)
         keys.push(m[1])
         regX = regX.replace(m[0],'(\\:[a-zA-Z0-9-_]+)')
         regY = regY.replace(m[0],'([a-zA-Z0-9-_]+)')
@@ -558,7 +581,7 @@ var Vue
 VueRouter.install = function(v){
     Vue = v
     var self = this
-    console.log(this.$router)
+    // console.log(this.$router)
     Vue.component('router-link',{
         props:{
             to:{
@@ -579,7 +602,7 @@ VueRouter.install = function(v){
             return h(this.tag,{
                 on:{
                     "click": () => {
-                        console.log(this.to)
+                        // console.log(this.to)
                         let obj
                         if(typeof this.to === "string"){
                             obj = {
@@ -594,7 +617,7 @@ VueRouter.install = function(v){
                         this.$router.push(obj||this.to)
                     }
                 }
-                },this.$slots.default)
+            },this.$slots.default)
 
         }
     })
@@ -602,38 +625,53 @@ VueRouter.install = function(v){
 
     Vue.component('router-view',{
         name: 'router-view',
+        functional: true,
         props:{
-          name:{
-              type:String,
-              default:'default'
-          }
+            name:{
+                type:String,
+                default:'default'
+            }
         },
-        render(h){
-            // debugger
-            if(!this.$route){
-                console.log(this.$route )
+        render(h,ref){
+            var data = ref.data
+            var name = ref.name||'default'
+            var children = ref.children;
+            var parent = ref.parent;
+            var route = parent.$route;
+            // console.log(ref.parent._root)
+            if(!route){
+                // console.log(route)
                 return
             }
 
-            let matched = this.$route.matched
+            let matched = route.matched
             if(!matched) return
 
             //执行那一系列的钩子
 
-            this.dataRouteView = true
-            var depth = 0
-            let parent = this.$parent
-            while(parent){
-                if(parent.dataRouteView){
+            data.dataRouteView = true
 
-                    depth++
+            var depth = 0
+            while(parent&&parent._routerRoot !== parent){
+                var vnodeData = parent.$vnode ? parent.$vnode.data : {};
+                if (vnodeData.dataRouteView) {
+                    depth++;
                 }
                 parent = parent.$parent
             }
+            let m = matched[depth]
+            data.registerInstance = function (vm,val) {
+                var current = m.instances[name]
+                if(val&& current !== vm||!val&&val===current){
+                    m.instances[name] = val
+                }
+            }
             // debugger
-           return h(matched[depth]?matched[depth].components[this.name||'default']:null)
+            return h(matched[depth]?matched[depth].components[name||'default']:null,data,children)
         }
     })
+
+
     Vue.mixin({
         beforeCreate(){
             if(this.$options&&this.$options.router){
@@ -643,7 +681,8 @@ VueRouter.install = function(v){
             }else{
                 this._root =  this.$parent && this.$parent._root
             }
-            // registerInstance(this, this);
+
+            registerInstance(this,this)
             Object.defineProperty(this,'$router',{
                 get(){
                     return this._root._router
