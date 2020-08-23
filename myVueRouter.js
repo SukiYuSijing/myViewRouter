@@ -13,17 +13,18 @@ class HistoryRoute {
 
     }
 }
-
+var cbs = []
 function extractUpdateRoutesFn(updatedRoutes) {
     var fns = []
     updatedRoutes&&updatedRoutes.forEach(updatedRoute=>{
         let components = updatedRoute.components
-        for(let item of Object.values(components)){
+        for(let [index,item] of Object.entries(components)){
             if(typeof  item !=='function'){
                 var def = Vue.extend(item);
+                var instance = updatedRoute.instances[index]
                 var f = def.options['beforeRouteUpdate']
                 if(f){
-                    fns.push(f.bind(def))
+                    fns.push(f.bind(instance))
                 }
 
             }
@@ -49,12 +50,13 @@ function extractLeaveRoutesFn(deviatedRoutes) {
     var fns = []
     deviatedRoutes&&deviatedRoutes.forEach(deviatedRoute=>{
         let components = deviatedRoute.components
-        for(let item of Object.values(components)){
+        for(let [index,item] of Object.entries(components)){
             if(typeof  item !=='function'){
                 var def = Vue.extend(item);
+                var instance = deviatedRoute.instances[index]
                 var f = def.options['beforeRouteLeave']
                 if(f){
-                    fns.push(f.bind(def))
+                    fns.push(f.bind(instance))
                 }
 
             }
@@ -63,21 +65,22 @@ function extractLeaveRoutesFn(deviatedRoutes) {
     return fns
 }
 
-var cbs = []
+
 function extractEnterGuards(activatedRoutes, postEnterCbs) {
     var fns = []
     activatedRoutes&&activatedRoutes.forEach(activatedRoute=>{
         // debugger
         let components = activatedRoute.components
-        for(let item of Object.values(components)){
+        for(let [index,item] of Object.entries(components)){
             if(typeof  item !=='function'){
                 var def = Vue.extend(item);
+                var instance = activatedRoute.instances[index]
                 var f = def.options['beforeRouteEnter']
                 if(f){
                     var f1 = function(to,from,next){
                         f(to,from,function (cb) {
                             if(typeof cb === "function"){
-                                cbs.push(cb)
+                                postEnterCbs.push(cb)
                             }
                         })
                         next()
@@ -130,7 +133,6 @@ class VueRouter{
                 this.push(obj)
             })
             window.addEventListener("hashchange",(event)=>{
-                debugger
                 console.log(this,this.toRoute.fullPath)
                 let h = this.toRoute.fullPath
                 if(!h.startsWith('#')){
@@ -513,7 +515,7 @@ VueRouter.prototype.ConfirmTransitionTo = function (route,onComplete,onAbort){
 
     runQueue(queue,iterator, () =>{
         //上面的hook执行完了
-        var queue = extractEnterGuards(transitionRoutes.activatedRoutes,[]).concat(this.resolveHooks)
+        var queue = extractEnterGuards(transitionRoutes.activatedRoutes,cbs).concat(this.resolveHooks)
         runQueue(queue,iterator, ()=> {
             // debugger
             // console.log(cbs)
@@ -681,7 +683,7 @@ VueRouter.install = function(v){
             }else{
                 this._root =  this.$parent && this.$parent._root
             }
-
+            debugger
             registerInstance(this,this)
             Object.defineProperty(this,'$router',{
                 get(){
@@ -698,6 +700,3 @@ VueRouter.install = function(v){
     })
 }
 export default VueRouter
-
-/*
-* */
